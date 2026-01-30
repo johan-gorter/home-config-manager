@@ -4,4 +4,4 @@ printf "  homelab: "; systemctl is-active homelab.service 2>/dev/null || echo "i
 printf "  kiosk:   "; systemctl is-active kiosk.service 2>/dev/null || echo "inactive"
 echo
 echo "=== Containers ==="
-sudo docker compose -f /opt/homelab/docker-compose.yml ps
+sudo docker compose -f /home/jgo/workspace/config/docker-compose.yml ps

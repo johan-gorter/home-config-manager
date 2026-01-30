@@ -12,5 +12,5 @@ if [[ "$1" == "kiosk" ]]; then
 elif [[ -n "$1" ]]; then
     sudo docker logs -f "$1"
 else
-    sudo docker compose -f /opt/homelab/docker-compose.yml logs -f
+    sudo docker compose -f /home/jgo/workspace/config/docker-compose.yml logs -f
 fi

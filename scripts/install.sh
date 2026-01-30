@@ -23,7 +23,7 @@ INSTALL_KIOSK=true
 INSTALL_DOCKER=true
 INSTALL_ZIGBEE=true
 START_SERVICES=false
-DATA_DIR="/opt/homelab"
+DATA_DIR="/home/jgo/workspace/config"
 
 # Colors
 RED='\033[0;31m'
@@ -360,7 +360,7 @@ setup_watchdog() {
     cat > /usr/local/bin/homelab-watchdog << 'EOF'
 #!/bin/bash
 # Restart unhealthy containers
-cd /opt/homelab
+cd /home/jgo/workspace/config
 for container in $(docker compose ps --services 2>/dev/null); do
     if ! docker ps --filter "name=$container" --filter "status=running" -q | grep -q .; then
         logger -t homelab-watchdog "Container $container not running, restarting..."

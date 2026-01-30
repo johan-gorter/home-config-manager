@@ -18,7 +18,7 @@ REMOVE_PACKAGES=false
 REMOVE_USER=false
 SKIP_CONFIRM=false
 KIOSK_USER="kiosk"
-DATA_DIR="/opt/homelab"
+DATA_DIR="/home/jgo/workspace/config"
 
 # Colors
 RED='\033[0;31m'

@@ -37,7 +37,7 @@ Defaults: URL `http://localhost:8123`, Zigbee device `/dev/ttyUSB0`.
 
 Functions executed by `main()`:
 1. **install_docker()** — Docker + Compose installation
-2. **setup_containers()** — Creates `/opt/homelab/`, generates configs and `docker-compose.yml`
+2. **setup_containers()** — Creates `config/`, generates configs and `docker-compose.yml`
 3. **setup_compose_service()** — Registers `homelab.service` systemd unit
 4. **setup_kiosk()** — X.org/Openbox/Firefox ESR kiosk, `kiosk` user, `kiosk.service`
 5. **setup_screen_control()** — `/usr/local/bin/screen-control` utility
