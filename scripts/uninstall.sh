@@ -18,7 +18,9 @@ REMOVE_PACKAGES=false
 REMOVE_USER=false
 SKIP_CONFIRM=false
 KIOSK_USER="kiosk"
-DATA_DIR="/home/jgo/workspace/config"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+DATA_DIR="$REPO_DIR/config"
 
 # Colors
 RED='\033[0;31m'

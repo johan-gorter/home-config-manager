@@ -12,5 +12,7 @@ if [[ "$1" == "kiosk" ]]; then
 elif [[ -n "$1" ]]; then
     sudo docker logs -f "$1"
 else
-    sudo docker compose -f /home/jgo/workspace/config/docker-compose.yml logs -f
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    COMPOSE_FILE="$(dirname "$SCRIPT_DIR")/config/docker-compose.yml"
+    sudo docker compose -f "$COMPOSE_FILE" logs -f
 fi

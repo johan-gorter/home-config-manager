@@ -4,4 +4,6 @@ printf "  homelab: "; systemctl is-active homelab.service 2>/dev/null || echo "i
 printf "  kiosk:   "; systemctl is-active kiosk.service 2>/dev/null || echo "inactive"
 echo
 echo "=== Containers ==="
-sudo docker compose -f /home/jgo/workspace/config/docker-compose.yml ps
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+COMPOSE_FILE="$(dirname "$SCRIPT_DIR")/config/docker-compose.yml"
+sudo docker compose -f "$COMPOSE_FILE" ps
