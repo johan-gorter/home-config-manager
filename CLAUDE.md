@@ -15,12 +15,27 @@ Claude Code is managing and configuring this homelab server. The user has basic 
 
 ```
 scripts/
-  install.sh      # Full homelab + kiosk provisioning
-  uninstall.sh    # Reverses install.sh (with confirmation prompts)
-  start.sh        # Start homelab containers
-  stop.sh         # Stop kiosk + containers
-  status.sh       # Show service and container status
-  logs.sh         # View logs (all, per-container, or kiosk)
+  install.sh          # Slim orchestrator — sources lib files, parses args, calls functions
+  uninstall.sh        # Slim orchestrator — sources lib/common.sh, does removal
+  lib/
+    common.sh         # Shared: paths, colors, logging, render_template()
+    docker.sh         # install_docker()
+    containers.sh     # setup_containers() — renders templates into config/
+    services.sh       # setup_compose_service(), setup_watchdog(), setup_config_backup()
+    kiosk.sh          # setup_kiosk(), setup_screen_control()
+  templates/
+    docker-compose.yml.tpl
+    mosquitto.conf
+    zigbee2mqtt.yaml.tpl
+    homelab.service.tpl
+    kiosk.service.tpl
+    openbox-autostart.tpl
+    homelab-watchdog.tpl
+    homelab-config-backup.tpl
+  start.sh            # Sources common.sh for COMPOSE_FILE
+  stop.sh             # Stop kiosk + containers
+  status.sh           # Sources common.sh for COMPOSE_FILE
+  logs.sh             # Sources common.sh for COMPOSE_FILE
 ```
 
 ## Scripts
@@ -36,12 +51,13 @@ Options: `--url <url>`, `--zigbee <device>`, `--skip-kiosk`, `--skip-docker`, `-
 Defaults: URL `http://localhost:8123`, Zigbee device `/dev/ttyUSB0`.
 
 Functions executed by `main()`:
-1. **install_docker()** — Docker + Compose installation
-2. **setup_containers()** — Creates `config/`, generates configs and `docker-compose.yml`
-3. **setup_compose_service()** — Registers `homelab.service` systemd unit
-4. **setup_kiosk()** — X.org/Openbox/Firefox ESR kiosk, `kiosk` user, `kiosk.service`
-5. **setup_screen_control()** — `/usr/local/bin/screen-control` utility
-6. **setup_watchdog()** — Cron job restarting unhealthy containers every 5 min
+1. **install_docker()** — Docker + Compose installation (`lib/docker.sh`)
+2. **setup_containers()** — Creates `config/`, renders templates into configs (`lib/containers.sh`)
+3. **setup_compose_service()** — Registers `homelab.service` systemd unit (`lib/services.sh`)
+4. **setup_watchdog()** — Cron job restarting unhealthy containers every 5 min (`lib/services.sh`)
+5. **setup_config_backup()** — Nightly git-based config backup at 3 AM (`lib/services.sh`)
+6. **setup_kiosk()** — X.org/Openbox/Firefox ESR kiosk, `kiosk` user, `kiosk.service` (`lib/kiosk.sh`)
+7. **setup_screen_control()** — `/usr/local/bin/screen-control` utility (`lib/kiosk.sh`)
 
 ### uninstall.sh
 
@@ -79,3 +95,5 @@ Removes services, containers, configs, and data. Does not remove Docker or apt p
 - Avahi broadcasts `silver.local` for network-wide access
 - Scripts handle non-interactive execution (no TTY) gracefully
 - Scripts use `set -euo pipefail` with color-coded logging
+- Config files are generated from `scripts/templates/` via `render_template()` (`{{VAR}}` substitution)
+- Nightly config backup via git commit+push in `config/` (cron at 3 AM)

@@ -13,24 +13,14 @@ set -euo pipefail
 #   --help              Show this help
 #===============================================================================
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+
 REMOVE_DOCKER=false
 REMOVE_PACKAGES=false
 REMOVE_USER=false
 SKIP_CONFIRM=false
 KIOSK_USER="kiosk"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_DIR="$(dirname "$SCRIPT_DIR")"
-DATA_DIR="$REPO_DIR/config"
-
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-log_info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
-log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 confirm() {
     if $SKIP_CONFIRM; then return 0; fi
@@ -112,9 +102,10 @@ done
 systemctl daemon-reload
 
 #===============================================================================
-# Remove watchdog
+# Remove watchdog and config backup
 #===============================================================================
-for f in /etc/cron.d/homelab-watchdog /usr/local/bin/homelab-watchdog; do
+for f in /etc/cron.d/homelab-watchdog /usr/local/bin/homelab-watchdog \
+         /etc/cron.d/homelab-config-backup /usr/local/bin/homelab-config-backup; do
     if [[ -f "$f" ]]; then
         log_info "Removing $f"
         rm -f "$f"
