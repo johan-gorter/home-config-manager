@@ -22,14 +22,13 @@ setup_watchdog() {
 }
 
 setup_config_backup() {
-    local backup_user
-    backup_user=$(stat -c '%U' "$DATA_DIR")
+    local backup_script="$REPO_DIR/scripts/config-backup.sh"
 
     render_template "$TEMPLATES_DIR/homelab-config-backup.tpl" \
-        /usr/local/bin/homelab-config-backup \
+        "$backup_script" \
         "DATA_DIR=$DATA_DIR"
-    chmod +x /usr/local/bin/homelab-config-backup
+    chmod +x "$backup_script"
 
-    echo "0 3 * * * $backup_user /usr/local/bin/homelab-config-backup" > /etc/cron.d/homelab-config-backup
-    log_info "Config backup cron installed (runs nightly at 3 AM as $backup_user)"
+    echo "0 3 * * * root $backup_script" > /etc/cron.d/homelab-config-backup
+    log_info "Config backup cron installed (runs nightly at 3 AM)"
 }

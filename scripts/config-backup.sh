@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-DATA_DIR="{{DATA_DIR}}"
+DATA_DIR="/home/jgo/workspace/config"
 
 if [ "$(id -u)" -eq 0 ]; then
     OWNER=$(stat -c '%U:%G' "$DATA_DIR")

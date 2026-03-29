@@ -97,3 +97,4 @@ Removes services, containers, configs, and data. Does not remove Docker or apt p
 - Scripts use `set -euo pipefail` with color-coded logging
 - Config files are generated from `scripts/templates/` via `render_template()` (`{{VAR}}` substitution)
 - Nightly config backup via git commit+push in `config/` (cron at 3 AM)
+- **Important lights must have a physical fallback**: lights in essential spaces (toilets, hallways, stairs) must be controllable via direct Zigbee binding so they work even when the network, server, or Zigbee2MQTT is completely down. Use `genOnOff` cluster binds from physical buttons to lamps.
