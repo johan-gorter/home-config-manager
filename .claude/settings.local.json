@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dpkg:*)"
+      "Bash(dpkg:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker ps:*)",
+      "Bash(sudo docker logs:*)",
+      "Bash(sudo docker exec:*)",
+      "Bash(sudo docker restart:*)",
+      "Bash(curl:*)"
     ]
   }
 }
