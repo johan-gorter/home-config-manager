@@ -12,12 +12,14 @@ setup_compose_service() {
 }
 
 setup_watchdog() {
-    render_template "$TEMPLATES_DIR/homelab-watchdog.tpl" \
-        /usr/local/bin/homelab-watchdog \
-        "DATA_DIR=$DATA_DIR"
-    chmod +x /usr/local/bin/homelab-watchdog
+    local watchdog_script="$REPO_DIR/scripts/watchdog.sh"
 
-    echo "*/5 * * * * root /usr/local/bin/homelab-watchdog" > /etc/cron.d/homelab-watchdog
+    render_template "$TEMPLATES_DIR/homelab-watchdog.tpl" \
+        "$watchdog_script" \
+        "DATA_DIR=$DATA_DIR"
+    chmod +x "$watchdog_script"
+
+    echo "*/5 * * * * root $watchdog_script" > /etc/cron.d/homelab-watchdog
     log_info "Watchdog cron installed"
 }
 
