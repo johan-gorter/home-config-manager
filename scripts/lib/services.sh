@@ -34,3 +34,8 @@ setup_config_backup() {
     echo "0 3 * * * root $backup_script" > /etc/cron.d/homelab-config-backup
     log_info "Config backup cron installed (runs nightly at 3 AM)"
 }
+
+setup_nightly_reboot() {
+    echo "30 3 * * * root /sbin/reboot" > /etc/cron.d/homelab-nightly-reboot
+    log_info "Nightly reboot cron installed (runs at 3:30 AM)"
+}

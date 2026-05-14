@@ -105,7 +105,8 @@ systemctl daemon-reload
 # Remove watchdog and config backup
 #===============================================================================
 for f in /etc/cron.d/homelab-watchdog /usr/local/bin/homelab-watchdog \
-         /etc/cron.d/homelab-config-backup /usr/local/bin/homelab-config-backup; do
+         /etc/cron.d/homelab-config-backup /usr/local/bin/homelab-config-backup \
+         /etc/cron.d/homelab-nightly-reboot; do
     if [[ -f "$f" ]]; then
         log_info "Removing $f"
         rm -f "$f"

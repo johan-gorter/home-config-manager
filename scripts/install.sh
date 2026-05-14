@@ -85,6 +85,7 @@ main() {
         setup_compose_service
         setup_watchdog
         setup_config_backup
+        setup_nightly_reboot
     fi
 
     if $INSTALL_KIOSK; then
