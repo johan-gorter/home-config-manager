@@ -22,7 +22,7 @@ docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
 # Claude Code update (runs as the repo owner, not root)
 OWNER=$(stat -c '%U' "$REPO_DIR")
 log "Updating Claude Code"
-sudo -u "$OWNER" /home/"$OWNER"/.local/bin/claude update --yes 2>&1 || \
+sudo -u "$OWNER" /home/"$OWNER"/.local/bin/claude update 2>&1 || \
     log "Claude Code update skipped or already up to date"
 
 log "Maintenance complete"
