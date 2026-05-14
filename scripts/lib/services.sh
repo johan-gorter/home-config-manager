@@ -31,8 +31,9 @@ setup_config_backup() {
         "DATA_DIR=$DATA_DIR"
     chmod +x "$backup_script"
 
-    echo "0 3 * * * root $backup_script" > /etc/cron.d/homelab-config-backup
-    log_info "Config backup cron installed (runs nightly at 3 AM)"
+    local maintenance_script="$REPO_DIR/scripts/maintenance.sh"
+    echo "0 3 * * * root $backup_script && $maintenance_script" > /etc/cron.d/homelab-config-backup
+    log_info "Config backup + maintenance cron installed (runs nightly at 3 AM)"
 }
 
 setup_nightly_reboot() {
