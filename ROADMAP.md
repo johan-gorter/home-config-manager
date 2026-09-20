@@ -11,13 +11,13 @@ wordt opnieuw gedaan op Ubuntu Desktop 26.04.
 |---|---|
 | Hardware | Laptop, Intel, eDP-paneel. Accu = ingebouwde UPS |
 | OS | Ubuntu Desktop 26.04 LTS (was: Server) |
-| Zigbee | Nieuwe, betere antenne/coördinator (type nog te bepalen — zie B4) |
+| Zigbee | **Compleet nieuw netwerk**, from scratch opgebouwd. Geen migratie van het oude huis — zie 13 |
 | Gebruikers | `jgo` (beheer, sudo) · `homeassistant` (draait de stack) · `kiosk` (toont het dashboard) |
 | Fysieke beveiliging | **Buiten scope.** Geen LUKS, geen BIOS/GRUB-wachtwoord. Wie bij de laptop kan, is root — dat accepteren we bewust |
 | Harde eis | Na een reboot komt alles vanzelf op, zonder handeling, zodat lampen en automatiseringen direct werken |
 | Node-RED | **Nee.** HA's eigen automatiseringen volstaan; twee plekken met logica maakt debuggen dubbel zo moeilijk |
 | Isolatie | Docker blijft. De scheiding tussen `jgo` en `homeassistant` is **cosmetisch** — zie 6. `kiosk` is de enige echte beveiligingsgrens |
-| Backup | `restic` offsite, geen lokale kopie. YAML apart in een privé GitHub-repo — zie 7. Bestemming nog te bevestigen, zie B1 |
+| Backup | `restic` naar Hetzner Storage Box BX11, offsite only. YAML apart in een privé GitHub-repo — zie 7 |
 | Langetermijndata | Verbruik, warmte en temperatuur worden **eeuwig** bewaard in InfluxDB, als basis voor een MPC-regeling — zie 11 |
 | Toegang van buiten | Tailscale (gratis). **Geen betaald Nabu Casa-abonnement.** Spraakbediening lokaal via Assist — zie 12 |
 
@@ -137,9 +137,16 @@ Wat we wel opruimen:
 
 ## 7. Backup en versiebeheer
 
-**Besloten:** `restic`, alleen offsite — geen lokale tweede kopie. YAML apart
-in een **privé GitHub-repo**. Geen VPS (Tailscale dekt de toegang van buiten).
-De bestemming is nog niet definitief: zie B1.
+**Besloten:** `restic` naar een **Hetzner Storage Box BX11** (1 TB,
+€3,20/mnd excl. btw, ~€3,87 incl., geen setup fee, EU), alleen offsite — geen
+lokale tweede kopie. YAML apart in een **privé GitHub-repo**. Geen VPS
+(Tailscale dekt de toegang van buiten).
+
+Een Storage Box is een beheerde dienst: geen OS om te patchen, geen SSH-server
+van ons. Een aangekondigd onderhoudsvenster kost hooguit één overgeslagen
+nachtelijke run — mits het backup-script daar netjes mee omgaat en de
+"backup is te oud"-melding pas na 48 uur afgaat, niet na één gemiste run.
+Anders leer je jezelf waarschuwingen te negeren.
 
 Volume blijft bescheiden, ook met de langetermijndata erbij: configuratie is
 enkele honderden MB, en InfluxDB doet er na compressie ruwweg 1–2 GB per jaar
@@ -172,13 +179,17 @@ bij. Ook over tien jaar zijn dat tientallen GB, geen honderden.
 
 ### Opzet
 
-- [ ] **Push vanaf de laptop** met een B2 application key **zonder
-      `deleteFiles`-recht**. Anders kan een gecompromitteerde of stukke laptop
-      zijn eigen backups wissen — precies op het moment dat je ze nodig hebt.
-- [ ] Omdat die key niet mag verwijderen, kan `restic forget --prune` niet vanaf
-      de laptop. Opruimen doen we handmatig met een tweede key, of we laten B2
-      lifecycle rules het doen. Retentie: **7 dagelijks / 4 wekelijks /
-      6 maandelijks**.
+- [ ] **Push vanaf de laptop** naar een sub-account met beperkte rechten, zodat
+      een gecompromitteerde of stukke laptop niet zijn eigen backups kan wissen —
+      precies op het moment dat je ze nodig hebt. Uitzoeken hoe ver Hetzner's
+      sub-accounts daarin gaan; desnoods `borg serve --append-only` in plaats
+      van restic, of leunen op de snapshots hieronder.
+- [ ] **Hetzner-snapshots aanzetten** als tweede verdedigingslinie, los van
+      restic. Die zitten buiten het bereik van de laptop en vangen dus ook
+      per ongeluk verwijderen en ransomware af.
+- [ ] Retentie: **7 dagelijks / 4 wekelijks / 6 maandelijks**, plus
+      maandelijkse snapshots die eeuwig blijven (zie de InfluxDB-regel
+      hierboven).
 - [ ] Het restic-wachtwoord staat **niet alleen op deze laptop**. Zonder dat
       wachtwoord is de backup onleesbaar — dat is het punt van encryptie, maar
       ook de manier waarop mensen hun backup kwijtraken. In een wachtwoord-
@@ -318,39 +329,54 @@ Geen poortforwarding, HA komt nergens aan het open internet.
   webhook-pad — niet voor heel HA, want dan geef je de afscherming weg waar je
   Tailscale juist voor koos.
 
+## 13. Zigbee: nieuw netwerk from scratch
+
+**Besloten:** er wordt niets gemigreerd. Het Zigbee-netwerk wordt in het nieuwe
+huis compleet opnieuw opgebouwd, met een nieuwe coördinator. Dat scheelt het
+gedoe van netwerksleutels overzetten, en het betekent dat we de chipset,
+het kanaal en de topologie vrij mogen kiezen — maar alleen als we het in de
+juiste volgorde doen.
+
+- [ ] **Kanaal kiezen vóórdat er iets joint.** Zigbee en 2,4 GHz wifi delen de
+      band. Kanaal 15, 20 of 25 ontwijken de gangbare wifi-kanalen 1, 6 en 11.
+      Achteraf wisselen betekent élk apparaat opnieuw koppelen, dus dit is een
+      eenmalige beslissing aan het begin.
+- [ ] **Stem dit af met het wifi-netwerk in het nieuwe huis.** Een wifi-mesh met
+      meerdere accesspoints die automatisch van kanaal wisselen, sloopt je
+      Zigbee door het hele huis heen — en je ziet het als willekeurige,
+      onverklaarbare uitval. Zet de accesspoints op vaste 2,4 GHz-kanalen en
+      kies daarna pas het Zigbee-kanaal. Liefst zoveel mogelijk apparaten op
+      5 GHz houden.
+- [ ] **Routers eerst, batterijapparaten daarna.** Dit is de fout die bijna
+      iedereen maakt bij een nieuw netwerk. Alleen apparaten op netstroom
+      (slimme stekkers, vaste lampen) routeren; sensoren en knoppen op batterij
+      doen dat niet. Een netwerk van alleen batterijsensoren heeft dus geen mesh
+      en hangt volledig aan de coördinator. Bovendien kiest een apparaat zijn
+      ouder op het moment van koppelen: join je een sensor voordat de routers er
+      staan, dan hangt hij daarna aan de coördinator vanaf een slechte plek.
+      Dus: eerst de routers plaatsen en joinen, dan pas de rest.
+- [ ] **Koppel apparaten op hun eindbestemming**, niet naast de laptop.
+- [ ] **Coördinator aan een USB-verlengkabel**, weg van de laptop. USB 3.0 en
+      SSD's stralen breed in de 2,4 GHz band; een stick die direct in de laptop
+      zit haalt een fractie van zijn bereik, en een betere antenne compenseert
+      dat niet.
+- [ ] **Direct na het opzetten `coordinator_backup.json` veiligstellen** (zie 7).
+- [ ] Naamgevingsconventie `{Ruimte} lamp/sensor/knop` vanaf het eerste apparaat
+      aanhouden, en de fysieke fallback-binds meteen leggen (zie 10). Achteraf
+      hernoemen is veel bewerkelijker.
+- [ ] Let op zwakke routers: sommige goedkope stekkers routeren slecht en laten
+      hun kinderen vallen. Liever een paar betrouwbare dan veel goedkope.
+
 # Deel 2 — Nog te beslissen
 
 > Besloten en verhuisd naar Deel 1: de backupopzet (restic, offsite, YAML in
-> privé GitHub-repo — zie 7), de isolatievraag (Docker blijft, `homeassistant`
-> is geen echte grens — zie 6), de langetermijndata (InfluxDB — zie 11) en de
-> toegang van buitenaf (Tailscale, geen Nabu Casa — zie 12).
+> privé GitHub-repo — zie 7), de backup-bestemming (Hetzner Storage Box BX11 —
+> zie 7), de isolatievraag (Docker blijft, `homeassistant` is geen echte grens —
+> zie 6), de langetermijndata (InfluxDB — zie 11), de toegang van buitenaf
+> (Tailscale, geen Nabu Casa — zie 12) en de Zigbee-migratievraag (niets
+> migreren, nieuw netwerk — zie 13).
 
-## B1. Backup-bestemming: waar precies?
-
-De opzet ligt vast (restic, offsite, delete-loze key), de bestemming nog niet.
-Prijzen gecheckt op 2026-09-20, even opnieuw verifiëren voor je bestelt.
-
-- **Hetzner Storage Box BX11** — €3,20/mnd excl. btw (~€3,87 incl.), 1 TB, geen
-  setup fee, EU. *Mijn voorkeur.* Niet de goedkoopste, maar een vaste factuur in
-  euro's zonder gratis-tier-grenzen die kunnen wijzigen, 1 TB kopruimte, en
-  ingebouwde snapshots als tweede verdedigingslinie naast restic. Beheerde
-  dienst: geen OS om te patchen, en een aangekondigd onderhoudsvenster kost
-  hooguit één overgeslagen nachtelijke run.
-- **Cloudflare R2** — 10 GB gratis, daarna ~$0,015/GB/mnd, geen egress-kosten.
-  Op ons volume een paar euro per jaar. Goedkoper, maar afhankelijk van een
-  gratis tier.
-- **Backblaze B2** — $6,95/TB/mnd. Onduidelijk of er een bodem van $6,95/mnd
-  geldt; dat kon ik niet bevestigd krijgen (bot-controle op hun site). Zo ja,
-  dan is dit juist de duurste optie en valt hij af.
-
-Het omslagpunt waarop Hetzner puur op prijs wint ligt rond 600 GB; daar zitten
-we ver onder. De keuze gaat dus niet over ruimte maar over gedoe.
-
-Randvoorwaarde bij elke optie: het backup-script moet een onbereikbare
-bestemming netjes overleven, en de "backup is te oud"-melding gaat pas na 48 uur
-af — niet na één gemiste run, anders leer je jezelf waarschuwingen negeren.
-
-## B2. Kiosk-sessie: welke browser en welke compositor?
+## B1. Kiosk-sessie: welke browser en welke compositor?
 
 - **Compositor**: `cage` (minimale Wayland-kiosk, geen window manager, geen
   Alt-Tab) versus `gnome-kiosk` (Ubuntu-eigen, meer meegeleverd) versus gewoon
@@ -366,36 +392,33 @@ af — niet na één gemiste run, anders leer je jezelf waarschuwingen negeren.
 - **Dashboard-opmaak**: willen we de `kiosk-mode` HACS-module om zijbalk en
   koptekst te verbergen?
 
-## B3. Zigbee: adapter, stack en plaatsing
+## B2. Zigbee: welke coördinator en welke stack?
 
-- **Welke coördinator** wordt het precies? (merk/chipset — TI CC2652, Silicon
-  Labs EFR32, …). Bepaalt de `adapter:`-instelling en of udev op serienummer kan
-  matchen; goedkope CH340's hebben vaak geen uniek serienummer.
-- **Zigbee2MQTT of ZHA?** We staan nu op Zigbee2MQTT (bredere
-  apparaatondersteuning, en directe binds zijn er makkelijker). Bij ZHA vervalt
-  Mosquitto — maar de fysieke-fallback-binds zijn daar bewerkelijker. Voorstel:
-  Zigbee2MQTT houden.
-- **Plaatsing!** De adapter moet aan een **USB-verlengkabel**, weg van de
-  laptop. USB 3.0-poorten en SSD's stralen breed in de 2.4 GHz band en een
-  coördinator die direct in de laptop steekt haalt een fractie van zijn bereik.
-  Een betere antenne compenseert dat niet. Waar komt de laptop te staan, en is
-  dat centraal genoeg in het huis?
-- **Migratie**: nemen we het bestaande Zigbee-netwerk mee (netwerksleutel +
-  coordinator-backup overzetten, apparaten blijven gekoppeld) of koppelen we
-  alles opnieuw in het nieuwe huis? Bij een andere chipset is overzetten vaak
-  niet mogelijk.
-- **Kanaalkeuze** afstemmen op het wifi-kanaal in het nieuwe huis.
+Het migratievraagstuk is weg (nieuw netwerk, zie 13). Wat nog open staat:
 
-## B4. Naamgeving en inventarisatie
+- **Welke coördinator** wordt het precies? (merk/chipset — TI CC2652/CC2674,
+  Silicon Labs EFR32, …). Bepaalt de `adapter:`-instelling, en of udev op
+  serienummer kan matchen: goedkope CH340-gebaseerde sticks hebben vaak geen
+  uniek serienummer en moeten dan op USB-poortpad gematcht worden.
+- **Zigbee2MQTT of ZHA?** Voorstel: Zigbee2MQTT houden — bredere
+  apparaatondersteuning, en de directe binds voor de fysieke fallback zijn er
+  makkelijker te leggen. Bij ZHA vervalt Mosquitto, maar worden die binds
+  bewerkelijker.
+- **Waar komt de laptop te staan**, en is dat centraal genoeg in het huis?
+  Bepaalt samen met de routerplaatsing de dekking.
+- **Welke wifi-apparatuur** komt er in het nieuwe huis, en op welke 2,4 GHz
+  kanalen? Nodig vóór de Zigbee-kanaalkeuze (zie 13).
+
+## B3. Naamgeving en inventarisatie
 
 - **Hostname**: `silver` was de oude laptop. Wordt het `geulwijk`, of iets
   anders? Werkt door in mDNS, in de repo en in alle documentatie.
 - **Welke ruimtes** krijgen de lamp/sensor/knop-opzet, en welke daarvan zijn
   "belangrijk" (= verplichte fysieke fallback)?
-- **Welke bestaande apparaten** gaan mee naar het nieuwe huis, en wat komt er
-  nieuw bij?
+- **Welke apparaten** komen er, en in welke volgorde kopen we ze? Routers
+  eerst (zie 13), dus de slimme stekkers en vaste lampen bepalen de planning.
 
-## B5. Kleinere open punten
+## B4. Kleinere open punten
 
 - **Spraakbediening**: willen we lokale Assist met een wake word, en zo ja op
   welke hardware (ESP32-satellieten of HA Voice PE)? En in welke ruimtes?
@@ -404,7 +427,8 @@ af — niet na één gemiste run, anders leer je jezelf waarschuwingen negeren.
   schrappen? `restart: unless-stopped` doet al het meeste werk.
 - **Recorder-retentie**: hoeveel dagen historie wil je bewaren? (Staat los van
   de backup — de database gaat daar niet in mee.)
-- **Matter/Thread** erbij, of voorlopig alleen Zigbee?
+- **Matter/Thread** erbij, of voorlopig alleen Zigbee? Nu we from scratch
+  beginnen is dit het moment om die vraag te stellen.
 - **Onderhoudsvenster**: als de nachtelijke reboot vervalt, wanneer draaien
   updates dan wel — en willen we een melding als er iets te updaten valt in
   plaats van automatisch?
