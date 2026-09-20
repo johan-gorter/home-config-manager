@@ -17,7 +17,9 @@ wordt opnieuw gedaan op Ubuntu Desktop 26.04.
 | Harde eis | Na een reboot komt alles vanzelf op, zonder handeling, zodat lampen en automatiseringen direct werken |
 | Node-RED | **Nee.** HA's eigen automatiseringen volstaan; twee plekken met logica maakt debuggen dubbel zo moeilijk |
 | Isolatie | Docker blijft. De scheiding tussen `jgo` en `homeassistant` is **cosmetisch** — zie 6. `kiosk` is de enige echte beveiligingsgrens |
-| Backup | `restic` naar Backblaze B2 (gratis tier), offsite only. YAML apart in een privé GitHub-repo — zie 7 |
+| Backup | `restic` offsite, geen lokale kopie. YAML apart in een privé GitHub-repo — zie 7. Bestemming nog te bevestigen, zie B1 |
+| Langetermijndata | Verbruik, warmte en temperatuur worden **eeuwig** bewaard in InfluxDB, als basis voor een MPC-regeling — zie 11 |
+| Toegang van buiten | Tailscale (gratis). **Geen betaald Nabu Casa-abonnement.** Spraakbediening lokaal via Assist — zie 12 |
 
 ---
 
@@ -135,12 +137,13 @@ Wat we wel opruimen:
 
 ## 7. Backup en versiebeheer
 
-**Besloten:** `restic` naar **Backblaze B2** (10 GB gratis tier), alleen
-offsite — geen lokale tweede kopie. YAML apart in een **privé GitHub-repo**.
-Geen VPS.
+**Besloten:** `restic`, alleen offsite — geen lokale tweede kopie. YAML apart
+in een **privé GitHub-repo**. Geen VPS (Tailscale dekt de toegang van buiten).
+De bestemming is nog niet definitief: zie B1.
 
-Dit past omdat de dataset klein is: zonder de historie-database is een volledige
-HA-staat typisch enkele honderden MB, en restic dedupliceert over snapshots heen.
+Volume blijft bescheiden, ook met de langetermijndata erbij: configuratie is
+enkele honderden MB, en InfluxDB doet er na compressie ruwweg 1–2 GB per jaar
+bij. Ook over tien jaar zijn dat tientallen GB, geen honderden.
 
 ### Wat er in de restic-backup gaat
 
@@ -154,12 +157,17 @@ HA-staat typisch enkele honderden MB, en restic dedupliceert over snapshots heen
 - [ ] `zigbee2mqtt/configuration.yaml` en `database.db`
 - [ ] Mosquitto-persistence
 - [ ] De gerenderde `docker-compose.yml` en de rest van de datamap
+- [ ] **De InfluxDB-data** (zie 11). Dit is de enige écht onvervangbare data in
+      de hele opstelling: configuratie kun je opnieuw maken, twee jaar
+      temperatuurhistorie niet. Daarom een afwijkende retentie: **maandelijkse
+      snapshots eeuwig bewaren**, niet 6 maanden.
 
 ### Wat er niet in gaat
 
-- [ ] `home-assistant_v2.db` — dat is historie, geen configuratie. Honderden MB
-      die elke seconde wijzigen, dedupliceert slecht, en je mist hem bij een
-      herstel niet (je verliest alleen grafiekhistorie).
+- [ ] `home-assistant_v2.db` — dat is korte-termijn historie voor de UI, geen
+      configuratie. Honderden MB die elke seconde wijzigen en slecht
+      dedupliceren. De data die je écht wilt bewaren staat in InfluxDB (zie 11),
+      niet hier.
 - [ ] Logs, `tts/`, `deps/`
 
 ### Opzet
@@ -179,6 +187,11 @@ HA-staat typisch enkele honderden MB, en restic dedupliceert over snapshots heen
       overlappende runs).
 - [ ] Monitoring: een melding in HA als de backup langer dan 48 uur geleden
       slaagde. Een backup waarvan je niet weet of hij draait, is geen backup.
+- [ ] **Consistente database-snapshot vóór de backup.** Kopieert restic een
+      draaiende InfluxDB of SQLite, dan krijg je een halve transactie en dus een
+      onbruikbaar bestand — en dat merk je pas bij het herstellen. Er moet een
+      dump- of snapshot-stap vooraf. Met de langetermijndata erbij is dit geen
+      detail meer.
 - [ ] **Restore-test inplannen** zodra de eerste backup staat. Ongetest is
       ongeldig.
 
@@ -240,13 +253,104 @@ HA-staat typisch enkele honderden MB, en restic dedupliceert over snapshots heen
 
 ---
 
+## 11. Langetermijndata voor Model Predictive Control
+
+Doel: verbruik (stroom, gas), warmte en temperaturen **jarenlang** bewaren om er
+later een MPC-regeling op te bouwen.
+
+- [ ] **InfluxDB als aparte container**, waar HA naartoe schrijft. De
+      HA-recorder is hier het verkeerde gereedschap: die is gebouwd voor korte
+      historie (standaard 10 dagen) en SQLite op een laptop-SSD is geen
+      tijdreeksdatabase. HA's eigen long-term statistics blijven wel eeuwig
+      bewaard, maar zijn uurgemiddelden — te grof voor een thermisch model.
+- [ ] Recorder blijft kort (UI-historie), InfluxDB bewaart alles.
+- [ ] Resolutie: 1–5 minuten voor temperaturen, vermogen en setpoints.
+- [ ] **P1-lezer op de slimme meter.** Voor een Nederlands huis veruit de beste
+      bron voor stroom en gas — echte meterstanden op hoge frequentie, veel
+      beter dan losse klemmen of slimme stekkers.
+
+### Dit moet vanaf dag één draaien
+
+**Dringender dan de rest van deze roadmap.** Je kunt data niet met
+terugwerkende kracht verzamelen, en voor een thermisch model heb je een volledig
+stookseizoen nodig — dat is een jaar kalendertijd. Elke maand uitstel is een
+maand trainingsdata die je nooit meer krijgt. Loggen begint zodra de server
+staat, ruim voordat er aan MPC gewerkt wordt.
+
+Twee dingen die een dataset achteraf waardeloos maken:
+
+- [ ] **Log ook de ingangen, niet alleen de uitkomsten**: setpoints, ketel- en
+      klepstanden, ramen/deuren open, aanwezigheid. Een model dat alleen
+      binnentemperatuur ziet kan niets causaals leren.
+- [ ] **Buitentemperatuur én zoninstraling binnenhalen** (weer-integratie of
+      KNMI). Dat zijn de dominante verstoringen in elk gebouwmodel; zonder die
+      twee is voorspellen onmogelijk.
+- [ ] Alles in UTC wegschrijven — zomertijd maakt anders twee uur per jaar
+      onbruikbaar.
+
+## 12. Toegang van buitenaf
+
+**Besloten: Tailscale, gratis. Geen betaald Nabu Casa-abonnement.**
+Geen poortforwarding, HA komt nergens aan het open internet.
+
+- [ ] Tailscale op de host installeren (niet in de container; HA draait toch op
+      host-netwerk).
+- [ ] **Key expiry uitzetten voor de server-node.** Node-keys verlopen standaard
+      na een half jaar. Op een machine waar je nooit naar kijkt betekent dat:
+      over zes maanden werkt toegang van buiten ineens niet meer, zonder
+      waarschuwing en zonder duidelijke oorzaak. Dag één regelen.
+- [ ] Echt HTTPS-certificaat via `tailscale cert` / `tailscale serve` — de
+      companion-app werkt daar veel beter mee dan met een kaal IP-adres.
+- [ ] Bij gebruik van `tailscale serve`: `use_x_forwarded_for` en
+      `trusted_proxies` in HA zetten. Zonder dat ziet HA elke login vanaf
+      hetzelfde adres en werkt de brute-force-bescherming niet meer.
+- [ ] `external_url` op de Tailscale-naam zetten.
+- [ ] **Subnet routing** aanzetten, dan kun je onderweg ook bij Zigbee2MQTT
+      (8080), de router en de rest van het thuisnetwerk.
+
+### Wat we daarmee bewust niet hebben
+
+- **Google Assistant / Alexa** vragen een publiek eindpunt en vallen dus af.
+  In plaats daarvan: **HA Assist, volledig lokaal**, met een ESP32-satelliet of
+  HA's eigen Voice-hardware. Geen abonnement, geen cloud. Zie B4.
+- **Inkomende webhooks** kunnen niet door een dichte tunnel. Mocht dat ooit
+  nodig zijn: **Tailscale Funnel** (ook gratis), maar dan alléén voor dat ene
+  webhook-pad — niet voor heel HA, want dan geef je de afscherming weg waar je
+  Tailscale juist voor koos.
+
 # Deel 2 — Nog te beslissen
 
-> Besloten en verhuisd naar Deel 1: de backupopzet (restic → Backblaze B2, geen
-> VPS, YAML in privé GitHub-repo — zie 7) en de isolatievraag (Docker blijft,
-> `homeassistant` is geen echte grens — zie 6).
+> Besloten en verhuisd naar Deel 1: de backupopzet (restic, offsite, YAML in
+> privé GitHub-repo — zie 7), de isolatievraag (Docker blijft, `homeassistant`
+> is geen echte grens — zie 6), de langetermijndata (InfluxDB — zie 11) en de
+> toegang van buitenaf (Tailscale, geen Nabu Casa — zie 12).
 
-## B1. Kiosk-sessie: welke browser en welke compositor?
+## B1. Backup-bestemming: waar precies?
+
+De opzet ligt vast (restic, offsite, delete-loze key), de bestemming nog niet.
+Prijzen gecheckt op 2026-09-20, even opnieuw verifiëren voor je bestelt.
+
+- **Hetzner Storage Box BX11** — €3,20/mnd excl. btw (~€3,87 incl.), 1 TB, geen
+  setup fee, EU. *Mijn voorkeur.* Niet de goedkoopste, maar een vaste factuur in
+  euro's zonder gratis-tier-grenzen die kunnen wijzigen, 1 TB kopruimte, en
+  ingebouwde snapshots als tweede verdedigingslinie naast restic. Beheerde
+  dienst: geen OS om te patchen, en een aangekondigd onderhoudsvenster kost
+  hooguit één overgeslagen nachtelijke run.
+- **Cloudflare R2** — 10 GB gratis, daarna ~$0,015/GB/mnd, geen egress-kosten.
+  Op ons volume een paar euro per jaar. Goedkoper, maar afhankelijk van een
+  gratis tier.
+- **Backblaze B2** — $6,95/TB/mnd. Onduidelijk of er een bodem van $6,95/mnd
+  geldt; dat kon ik niet bevestigd krijgen (bot-controle op hun site). Zo ja,
+  dan is dit juist de duurste optie en valt hij af.
+
+Het omslagpunt waarop Hetzner puur op prijs wint ligt rond 600 GB; daar zitten
+we ver onder. De keuze gaat dus niet over ruimte maar over gedoe.
+
+Randvoorwaarde bij elke optie: het backup-script moet een onbereikbare
+bestemming netjes overleven, en de "backup is te oud"-melding gaat pas na 48 uur
+af — niet na één gemiste run, anders leer je jezelf waarschuwingen negeren.
+
+## B2. Kiosk-sessie: welke browser en welke compositor?
 
 - **Compositor**: `cage` (minimale Wayland-kiosk, geen window manager, geen
   Alt-Tab) versus `gnome-kiosk` (Ubuntu-eigen, meer meegeleverd) versus gewoon
@@ -262,7 +366,7 @@ HA-staat typisch enkele honderden MB, en restic dedupliceert over snapshots heen
 - **Dashboard-opmaak**: willen we de `kiosk-mode` HACS-module om zijbalk en
   koptekst te verbergen?
 
-## B2. Zigbee: adapter, stack en plaatsing
+## B3. Zigbee: adapter, stack en plaatsing
 
 - **Welke coördinator** wordt het precies? (merk/chipset — TI CC2652, Silicon
   Labs EFR32, …). Bepaalt de `adapter:`-instelling en of udev op serienummer kan
@@ -282,20 +386,6 @@ HA-staat typisch enkele honderden MB, en restic dedupliceert over snapshots heen
   niet mogelijk.
 - **Kanaalkeuze** afstemmen op het wifi-kanaal in het nieuwe huis.
 
-## B3. Toegang van buitenaf
-
-Nu er géén VPS komt, valt "reverse proxy op eigen server" af. Wat overblijft:
-
-- Wil je HA van buiten het huis kunnen bereiken? (waarschijnlijk ja — telefoon,
-  locatie-gebaseerde automatiseringen)
-- **Tailscale** (gratis voor thuisgebruik, geen open poorten, veruit het
-  makkelijkst) versus **Nabu Casa** (betaald, steunt het project, regelt meteen
-  Google/Alexa en een publieke URL voor webhooks) versus zelf WireGuard.
-  Voorstel: Tailscale, tenzij je Google/Alexa-integratie wilt.
-- Heb je webhooks van buitenaf nodig (bijv. een koppeling die HA moet kunnen
-  aanroepen)? Dat is het ene ding dat Tailscale níét oplost.
-- **Géén** poortforwarding naar HA vanaf het internet.
-
 ## B4. Naamgeving en inventarisatie
 
 - **Hostname**: `silver` was de oude laptop. Wordt het `geulwijk`, of iets
@@ -306,6 +396,9 @@ Nu er géén VPS komt, valt "reverse proxy op eigen server" af. Wat overblijft:
   nieuw bij?
 
 ## B5. Kleinere open punten
+
+- **Spraakbediening**: willen we lokale Assist met een wake word, en zo ja op
+  welke hardware (ESP32-satellieten of HA Voice PE)? En in welke ruimtes?
 
 - **Watchdog**: healthchecks toevoegen en hem slimmer maken, of helemaal
   schrappen? `restart: unless-stopped` doet al het meeste werk.
