@@ -116,6 +116,5 @@ Not built, by agreement: kiosk, backups, InfluxDB, Tailscale. See `ROADMAP.md`.
 - The Deco mesh should be pinned to a fixed 2.4 GHz channel; automatic selection
   can drift onto channel 11, which sits right against Zigbee channel 25.
 - `coordinator_backup.json` now holds the network key and exists on one SSD only.
-- Hostname is `sticker`, but the user calls the machine *silver*.
 - Bluetooth fails in Home Assistant — the container has no access to the host
   D-Bus. Needs a D-Bus mount if Bluetooth devices are wanted.

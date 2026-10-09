@@ -14,9 +14,8 @@ rather than asking the user to do so.
 ## Environment
 
 - OS: Ubuntu 26.04.1 LTS (`resolute`), kernel 7.0.0-38-generic, amd64
-- Hostname: `sticker`. The user refers to this machine as *silver* (the name of
-  the previous laptop) and reserved it under that name in the Deco app — worth
-  renaming one or the other to match. Final name still open (ROADMAP B3)
+- Hostname: `sticker`. (*silver* is the previous laptop, kept for a future
+  standby role — see ROADMAP B4. Do not confuse the two.)
 - Laptop, Intel GPU, eDP panel, **no Ethernet port** (WiFi `wlo1` only)
 - Host IP: 192.168.68.120/24, gateway 192.168.68.1. **DHCP reservation set** in
   the TP-Link Deco mesh, as is the coordinator's 192.168.68.109
@@ -148,7 +147,6 @@ only for YAML: automations, templates, custom components.
   so the integration throws errors in the log. Harmless until Bluetooth devices
   are needed; fixed with a D-Bus mount.
 - **No kiosk, no InfluxDB, no Tailscale.** See ROADMAP.
-- Hostname is still `sticker`.
 
 ## Functional requirements
 

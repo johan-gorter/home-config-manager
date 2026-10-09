@@ -9,7 +9,7 @@ wordt opnieuw gedaan op Ubuntu Desktop 26.04.
 
 | | |
 |---|---|
-| Hardware | Laptop, Intel, eDP-paneel. Accu = ingebouwde UPS |
+| Hardware | Laptop `sticker`, Intel, eDP-paneel. Accu = ingebouwde UPS |
 | OS | Ubuntu Desktop 26.04 LTS (was: Server) |
 | Zigbee | **Compleet nieuw netwerk**, from scratch opgebouwd. Geen migratie van het oude huis — zie 13 |
 | Gebruikers | `jgo` (beheer, sudo) · `homeassistant` (draait de stack) · `kiosk` (toont het dashboard) |
@@ -20,7 +20,7 @@ wordt opnieuw gedaan op Ubuntu Desktop 26.04.
 | Backup | `restic` naar Hetzner Storage Box BX11, offsite only. YAML apart in een privé GitHub-repo — zie 7 |
 | Langetermijndata | Verbruik, warmte en temperatuur worden **eeuwig** bewaard in InfluxDB, als basis voor een MPC-regeling — zie 11 |
 | Toegang van buiten | Tailscale (gratis). **Geen betaald Nabu Casa-abonnement.** Spraakbediening lokaal via Assist — zie 12 |
-| Reserve | De oude laptop *silver* komt ooit als standby beschikbaar voor noodgevallen — zie B4 |
+| Reserve | De oude laptop **silver** komt ooit als standby beschikbaar voor noodgevallen — zie B4. Deze machine is **sticker**; dat zijn twee verschillende laptops |
 
 ---
 
@@ -251,7 +251,8 @@ bij. Ook over tien jaar zijn dat tientallen GB, geen honderden.
 - [ ] `install.sh` echt idempotent maken (meerdere keren draaien mag niets stuk
       maken).
 - [ ] CLAUDE.md bijwerken: `setup_nightly_reboot` staat niet in de beschrijving,
-      hostname `silver` en `/dev/ttyUSB0` kloppen straks niet meer.
+      de oude hostname en `/dev/ttyUSB0` kloppen niet meer. **Gedaan** — zie
+      CLAUDE.md en `docs/install-log.md`.
 
 ## 10. Functionele requirements (blijven staan)
 
@@ -412,8 +413,6 @@ Het migratievraagstuk is weg (nieuw netwerk, zie 13). Wat nog open staat:
 
 ## B3. Naamgeving en inventarisatie
 
-- **Hostname**: `silver` was de oude laptop. Wordt het `geulwijk`, of iets
-  anders? Werkt door in mDNS, in de repo en in alle documentatie.
 - **Welke ruimtes** krijgen de lamp/sensor/knop-opzet, en welke daarvan zijn
   "belangrijk" (= verplichte fysieke fallback)?
 - **Welke apparaten** komen er, en in welke volgorde kopen we ze? Routers
@@ -478,9 +477,6 @@ van een downloadmiddag.
 - **Accu.** Een tweede laptop die 24/7 op 100% staat, blaast net zo hard op als
   de eerste. Laadlimiet instellen, of silver uit laten staan — maar dan is hij
   niet gesynchroniseerd, dus dat is een afruil.
-- **Hernoemen.** Deze machine heet `sticker` maar wordt *silver* genoemd, en de
-  oude laptop heet ook silver. Dat moet uit elkaar voordat er twee servers zijn,
-  anders is elke storing twee keer zo verwarrend. Hangt samen met B3.
 
 ## B5. Kleinere open punten
 
