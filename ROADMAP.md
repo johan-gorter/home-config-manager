@@ -20,6 +20,7 @@ wordt opnieuw gedaan op Ubuntu Desktop 26.04.
 | Backup | `restic` naar Hetzner Storage Box BX11, offsite only. YAML apart in een privé GitHub-repo — zie 7 |
 | Langetermijndata | Verbruik, warmte en temperatuur worden **eeuwig** bewaard in InfluxDB, als basis voor een MPC-regeling — zie 11 |
 | Toegang van buiten | Tailscale (gratis). **Geen betaald Nabu Casa-abonnement.** Spraakbediening lokaal via Assist — zie 12 |
+| Reserve | De oude laptop *silver* komt ooit als standby beschikbaar voor noodgevallen — zie B4 |
 
 ---
 
@@ -418,7 +419,70 @@ Het migratievraagstuk is weg (nieuw netwerk, zie 13). Wat nog open staat:
 - **Welke apparaten** komen er, en in welke volgorde kopen we ze? Routers
   eerst (zie 13), dus de slimme stekkers en vaste lampen bepalen de planning.
 
-## B4. Kleinere open punten
+## B4. Silver als reserveserver
+
+**Doel staat vast:** de oude laptop *silver* moet ooit beschikbaar zijn om het
+over te nemen als deze machine uitvalt. De uitvoering nog niet.
+
+Het goede nieuws zit in de hardware die er al staat: de **SLZB-MR5U is een
+netwerkcoördinator**. Bij een USB-stick zou overnemen betekenen dat je fysiek een
+dongle omprikt; nu wijst de reserveserver simpelweg naar dezelfde
+`tcp://192.168.68.109:6638` en draait hij. Geen hardware verplaatsen, niets
+opnieuw koppelen. Dat maakt dit een stuk realistischer dan het normaal is.
+
+### De harde beperking
+
+**Er mag maar één Zigbee2MQTT tegelijk op die coördinator zitten.** Twee
+instanties op dezelfde socket geeft een conflict. Elke opzet moet dus garanderen
+dat er precies één actief is — dat is de kern van het ontwerp, niet een detail.
+
+### Twee varianten
+
+- **Warme standby (mijn voorkeur).** Silver heeft dezelfde stack geïnstalleerd
+  maar gestopt, en krijgt periodiek de data gesynchroniseerd. Valt sticker uit,
+  dan start je de stack op silver. Herstel in minuten, handmatig, en geen enkele
+  kans op split-brain.
+- **Echte hot standby met automatische overname.** Vereist gedeelde of
+  gerepliceerde opslag, een gezondheidscontrole, automatische promotie én
+  fencing om te voorkomen dat beide tegelijk de coördinator pakken. Dat is veel
+  machinerie, en de faalwijze die je ervoor terugkrijgt — twee servers die
+  tegelijk in `.storage` en op de coördinator schrijven — is erger dan het
+  probleem dat je oplost.
+
+Ik raad warm aan. Bedenk ook dat je **belangrijke lampen al een fysieke
+Zigbee-fallback hebben** (zie 10): die werken ook met de server helemaal plat.
+Daarmee is twintig minuten downtime een ongemak en geen noodgeval, en verdampt
+het grootste deel van de waarde van automatische overname.
+
+### Mooie bijvangst
+
+Je zag eerder af van een lokale tweede backupkopie (zie 7). Met silver erbij
+krijg je die alsnog gratis: zet er een **lokale restic-repository** op. De
+synchronisatie die de standby actueel houdt ís dan je lokale backup, en je hebt
+alsnog de 3-2-1-regel compleet — SSD-crash herstel je dan in minuten in plaats
+van een downloadmiddag.
+
+### Nog te beslissen
+
+- **Wat wordt er gesynchroniseerd, en hoe vaak?** De z2m-data moet mee, anders
+  mist de reserve je laatst gekoppelde apparaten en klopt zijn beeld van het
+  netwerk niet meer met de coördinator.
+- **Hoe voorkomen we divergentie van je meetdata?** Als silver een tijd draait,
+  schrijft hij historie die sticker niet heeft, en andersom. Voor gewone
+  HA-historie boeiend noch erg; voor de **InfluxDB-data onder je MPC** (zie 11)
+  wel, want daar zijn gaten en dubbele reeksen juist schadelijk. Eén bron van
+  waarheid afspreken, of InfluxDB op één machine houden.
+- **Welk IP en welke naam krijgt silver bij overname?** Overneemt hij het adres
+  van sticker, of krijgt hij een eigen adres en verhuist alleen de Tailscale-naam
+  mee? Dat laatste is simpeler.
+- **Accu.** Een tweede laptop die 24/7 op 100% staat, blaast net zo hard op als
+  de eerste. Laadlimiet instellen, of silver uit laten staan — maar dan is hij
+  niet gesynchroniseerd, dus dat is een afruil.
+- **Hernoemen.** Deze machine heet `sticker` maar wordt *silver* genoemd, en de
+  oude laptop heet ook silver. Dat moet uit elkaar voordat er twee servers zijn,
+  anders is elke storing twee keer zo verwarrend. Hangt samen met B3.
+
+## B5. Kleinere open punten
 
 - **Spraakbediening**: willen we lokale Assist met een wake word, en zo ja op
   welke hardware (ESP32-satellieten of HA Voice PE)? En in welke ruimtes?
