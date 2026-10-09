@@ -104,9 +104,22 @@ user in the TP-Link Deco mesh.
 
 ## State at the end
 
-Running: Home Assistant 2026.10.0, Mosquitto 2, Zigbee2MQTT 2.14.2. Zero devices
-paired. Home Assistant onboarding not yet done (no account), so the MQTT
-integration is not configured either.
+Running: Home Assistant 2026.10.0, Mosquitto 2, Zigbee2MQTT 2.14.2.
+
+**First device paired on 2026-10-09**: a Philips Hue white filament globe
+G125 B22 (LWO007 / 9290030521), IEEE `0x001788010f2617ff`. It joined and
+interviewed cleanly and reports **LQI 108** — a sound direct link to the
+coordinator despite the distance, with margin to spare. It is a *Router*, being
+mains-powered, so it extends the mesh rather than depending on it. Brightness
+was set successfully from the Zigbee2MQTT frontend, which was the goal of these
+sessions.
+
+It still carries its IEEE address as a friendly name and needs renaming to
+`{Room} lamp` per the convention in `light-with-fallback.md`.
+
+Home Assistant onboarding is still not done (no account), so the MQTT
+integration is not configured either — the lamp is driven from Zigbee2MQTT
+directly.
 
 Not built, by agreement: kiosk, backups, InfluxDB, Tailscale. See `ROADMAP.md`.
 
