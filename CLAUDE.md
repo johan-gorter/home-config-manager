@@ -1,100 +1,169 @@
 # CLAUDE.md
 
-Claude Code is managing and configuring this homelab server. The user has basic Linux knowledge — prefer clear explanations, avoid jargon, and run commands directly rather than asking the user to do so.
+Claude Code manages and configures this homelab server. The user has basic Linux
+knowledge — prefer clear explanations, avoid jargon, and run commands directly
+rather than asking the user to do so.
+
+> **The `scripts/` directory is obsolete. Do not run `install.sh`.**
+> The running system was built by hand (see `docs/install-log.md`) and differs
+> from those scripts in almost every detail: different data directory, different
+> Docker packages, different Zigbee adapter and transport, no kiosk. Running
+> `install.sh` would write a second, conflicting stack. Treat `scripts/` as a
+> record of requirements only; `ROADMAP.md` supersedes it.
 
 ## Environment
 
-- Passwordless sudo is configured — use `sudo` freely without `-S` or askpass
-- OS: Ubuntu (amd64)
-- Hostname: `silver` (reachable as `silver.local` via Avahi/mDNS)
-- Zigbee adapter: CH340-based on `/dev/ttyUSB0` (adapter type: `zstack`)
-- GPU: Intel GeminiLake UHD 605 (`/dev/dri/card1`)
-- Display: eDP laptop panel on VT7, kiosk runs Firefox ESR
+- OS: Ubuntu 26.04.1 LTS (`resolute`), kernel 7.0.0-38-generic, amd64
+- Hostname: `sticker`. The user refers to this machine as *silver* (the name of
+  the previous laptop) and reserved it under that name in the Deco app — worth
+  renaming one or the other to match. Final name still open (ROADMAP B3)
+- Laptop, Intel GPU, eDP panel, **no Ethernet port** (WiFi `wlo1` only)
+- Host IP: 192.168.68.120/24, gateway 192.168.68.1. **DHCP reservation set** in
+  the TP-Link Deco mesh, as is the coordinator's 192.168.68.109
+- Passwordless sudo is configured for `jgo` — use `sudo` freely
+- Claude runs in the desktop app (deb package `claude-desktop`, apt repo at
+  downloads.claude.ai). There is **no** `claude` CLI on this machine; update with
+  `sudo apt install --only-upgrade claude-desktop`.
 
-## Project Structure
+## Users and permissions
 
-```
-scripts/
-  install.sh          # Slim orchestrator — sources lib files, parses args, calls functions
-  uninstall.sh        # Slim orchestrator — sources lib/common.sh, does removal
-  lib/
-    common.sh         # Shared: paths, colors, logging, render_template()
-    docker.sh         # install_docker()
-    containers.sh     # setup_containers() — renders templates into config/
-    services.sh       # setup_compose_service(), setup_watchdog(), setup_config_backup()
-    kiosk.sh          # setup_kiosk(), setup_screen_control()
-  templates/
-    docker-compose.yml.tpl
-    mosquitto.conf
-    zigbee2mqtt.yaml.tpl
-    homelab.service.tpl
-    kiosk.service.tpl
-    openbox-autostart.tpl
-    homelab-watchdog.tpl
-    homelab-config-backup.tpl
-  start.sh            # Sources common.sh for COMPOSE_FILE
-  stop.sh             # Stop kiosk + containers
-  status.sh           # Sources common.sh for COMPOSE_FILE
-  logs.sh             # Sources common.sh for COMPOSE_FILE
-```
-
-## Scripts
-
-### install.sh
-
-```bash
-sudo ./scripts/install.sh [options]
-```
-
-Options: `--url <url>`, `--zigbee <device>`, `--skip-kiosk`, `--skip-docker`, `--skip-zigbee`, `--start`, `--help`
-
-Defaults: URL `http://localhost:8123`, Zigbee device `/dev/ttyUSB0`.
-
-Functions executed by `main()`:
-1. **install_docker()** — Docker + Compose installation (`lib/docker.sh`)
-2. **setup_containers()** — Creates `config/`, renders templates into configs (`lib/containers.sh`)
-3. **setup_compose_service()** — Registers `homelab.service` systemd unit (`lib/services.sh`)
-4. **setup_watchdog()** — Cron job restarting unhealthy containers every 5 min (`lib/services.sh`)
-5. **setup_config_backup()** — Nightly git-based config backup at 3 AM (`lib/services.sh`)
-6. **setup_kiosk()** — X.org/Openbox/Firefox ESR kiosk, `kiosk` user, `kiosk.service` (`lib/kiosk.sh`)
-7. **setup_screen_control()** — `/usr/local/bin/screen-control` utility (`lib/kiosk.sh`)
-
-### uninstall.sh
-
-```bash
-sudo ./scripts/uninstall.sh [options]
-```
-
-Options: `--remove-docker`, `--remove-packages`, `--remove-user`, `--yes`, `--help`
-
-Removes services, containers, configs, and data. Does not remove Docker or apt packages unless explicitly requested.
-
-### Helper scripts
-
-| Script | Usage |
+| User | Purpose |
 |---|---|
-| `./scripts/start.sh` | Start containers, show status |
-| `./scripts/stop.sh` | Stop kiosk + containers |
-| `./scripts/status.sh` | Show service and container status |
-| `./scripts/logs.sh` | All container logs (live) |
-| `./scripts/logs.sh homeassistant` | Single container logs |
-| `./scripts/logs.sh kiosk` | Kiosk/X11 journal logs |
+| `jgo` | Administration, sudo. Member of group `homeassistant` |
+| `homeassistant` (uid 997, system user, nologin) | Owns the service data |
+| `kiosk` | **Not created yet** — see ROADMAP 2 and 3 |
 
-## Web UIs
+Data lives in `/srv/homeassistant`, owned `root:homeassistant`, mode `750`, with
+the **setgid bit on every directory** and a **default ACL** `g:homeassistant:rwX`.
 
-- Home Assistant: `http://silver.local:8123`
-- Zigbee2MQTT: `http://silver.local:8080`
+This combination is what makes the whole arrangement work, and it is easy to
+break: the containers run as root and write files as root, so without setgid plus
+the default ACL, `jgo` could not edit anything the containers create. Mosquitto
+additionally has ACLs for uid 1883 on its `data` and `log` directories, because
+that container drops to a non-root user.
 
-## Key Design Decisions
+Note that `homeassistant` is **not a security boundary** — see ROADMAP 6. Docker
+runs as root and starts the containers as root. The user exists for file
+ownership; the group is what does the actual work.
 
-- Multi-arch support via `dpkg --print-architecture`
-- Kiosk uses Firefox ESR (non-snap) since Ubuntu's Chromium snap doesn't work in systemd services
-- Kiosk runs on VT7 (`Ctrl+Alt+F7` to view, `Ctrl+Alt+F1` for terminal)
-- Kiosk waits for Home Assistant HTTP endpoint before launching Firefox
-- Zigbee2MQTT uses `adapter: zstack` and inherits system timezone
-- Avahi broadcasts `silver.local` for network-wide access
-- Scripts handle non-interactive execution (no TTY) gracefully
-- Scripts use `set -euo pipefail` with color-coded logging
-- Config files are generated from `scripts/templates/` via `render_template()` (`{{VAR}}` substitution)
-- Nightly config backup via git commit+push in `config/` (cron at 3 AM)
-- **Important lights must have a physical fallback**: lights in essential spaces (toilets, hallways, stairs) must be controllable via direct Zigbee binding so they work even when the network, server, or Zigbee2MQTT is completely down. Use `genOnOff` cluster binds from physical buttons to lamps.
+After changing group membership, log out and back in — a running shell keeps its
+old groups.
+
+## Layout
+
+```
+/srv/homeassistant/
+  docker-compose.yml
+  homeassistant/            # HA config, .storage, database
+  zigbee2mqtt/              # configuration.yaml, coordinator_backup.json
+  mosquitto/{config,data,log}
+/etc/systemd/system/homelab.service
+/etc/systemd/logind.conf.d/99-homelab.conf
+/etc/udev/rules.d/99-zigbee.rules      # present but currently unused (see below)
+```
+
+## Services
+
+Docker comes from **Ubuntu's own packages** (`docker.io` 29.1.3,
+`docker-compose-v2` 2.40.3), not Docker's upstream repository — one fewer
+third-party repo and key, and security updates arrive through the normal channel.
+
+| Container | Image | Notes |
+|---|---|---|
+| `homeassistant` | `ghcr.io/home-assistant/home-assistant:stable` (2026.10.0) | `network_mode: host`, **no** `privileged`, only `cap_add: [NET_RAW, NET_ADMIN]` |
+| `mosquitto` | `eclipse-mosquitto:2` | Published on **127.0.0.1:1883 only** |
+| `zigbee2mqtt` | `koenkk/zigbee2mqtt` (2.14.2) | Talks to the coordinator over TCP |
+
+`homelab.service` (oneshot, `RemainAfterExit`) is enabled and runs
+`docker compose up -d`. Verified: Home Assistant and Mosquitto came back by
+themselves after a reboot on 2026-10-09.
+
+Power management is disabled so the laptop can act as a server:
+`sleep.target`, `suspend.target`, `hibernate.target` and `hybrid-sleep.target`
+are masked, and logind ignores the lid switch on all power sources.
+
+## Zigbee
+
+Coordinator: **SMLIGHT SLZB-MR5U** — ESP32-S3 core running SLZB-OS, with two
+EFR32MG24 radios (Silicon Labs), two +5 dB antennas, Ethernet-first with PoE or
+USB-C power.
+
+- Connected over **Ethernet**, powered by a USB-C adapter
+- Device IP **192.168.68.109**, Zigbee socket on port **6638**, web UI on port 80
+- Zigbee2MQTT: `adapter: ember`, `port: tcp://192.168.68.109:6638`
+- EmberZNet 7.4.2 [GA], EZSP 13
+- **Channel 25**, PAN ID `0x1a62` (6754). Chosen because the house WiFi
+  (`gorterm`) sits on 2.4 GHz channel 8 and the neighbours occupy 2, 4 and 7 —
+  the whole lower half of the band is busy. Changing this later means re-pairing
+  every device.
+
+**USB-C cannot carry Zigbee on this model.** That port exposes the ESP32-S3's
+"SM Console", a text interface (`wipe`, `test_mode`, `device_ip`, `otbr_init`,
+`otbr_deinit`). This was established empirically: the console answered
+Zigbee2MQTT's EZSP/ASH reset frames with `Unknown cmd: <...>`. The udev rule in
+`/etc/udev/rules.d/99-zigbee.rules` dates from that attempt and is harmless but
+currently does nothing. It is kept because it still correctly matches the
+device's USB serial (`50:78:7D:D7:E3:B0`) should console access be needed again.
+
+The Ethernet interface uses MAC `52:78:7D:D7:E3:B0` — the same base MAC with the
+locally-administered bit set, which is how an ESP32 derives it. Useful when
+hunting for the device on the network.
+
+## Web interfaces
+
+| | URL | Auth |
+|---|---|---|
+| Home Assistant | http://localhost:8123 | Account required |
+| Zigbee2MQTT | http://localhost:8080 | **None** — see Known issues |
+| Coordinator | http://192.168.68.109 | Set in SLZB-OS |
+
+## Common tasks
+
+```bash
+sudo sh -c 'cd /srv/homeassistant && docker compose up -d'    # start
+sudo sh -c 'cd /srv/homeassistant && docker compose down'     # stop
+sudo docker logs -f zigbee2mqtt                               # follow logs
+sudo docker compose -f /srv/homeassistant/docker-compose.yml ps
+```
+
+Adding devices and integrations happens in the **web interface**, not in files.
+`\.storage/` is HA's internal state and must never be hand-edited. File access is
+only for YAML: automations, templates, custom components.
+
+## Known issues and gaps
+
+- **Zigbee2MQTT's frontend listens on 0.0.0.0:8080 with no authentication.**
+  Anyone on the WiFi can open it, control every device and enable `permit_join`.
+  Same class of problem as the Mosquitto exposure that was already fixed. Bind it
+  to 127.0.0.1 or put authentication in front of it.
+- **The Deco mesh must not roam across 2.4 GHz channels.** Deco defaults to
+  automatic channel selection, and an access point that drifts onto channel 11
+  lands right against Zigbee channel 25 (2475 MHz sits just above channel 11's
+  upper edge). The symptom is random, unexplained Zigbee dropouts across the
+  whole house. Pin the 2.4 GHz band to channel 1 or 6 in the Deco app.
+- **No backup yet.** `coordinator_backup.json` exists and holds the network key;
+  it lives on a single SSD. The agreed design (restic to a Hetzner Storage Box)
+  is in ROADMAP 7 and is not built.
+- **Bluetooth does not work in HA.** The container cannot reach the host's D-Bus,
+  so the integration throws errors in the log. Harmless until Bluetooth devices
+  are needed; fixed with a D-Bus mount.
+- **No kiosk, no InfluxDB, no Tailscale.** See ROADMAP.
+- Hostname is still `sticker`.
+
+## Functional requirements
+
+**Important lights must have a physical fallback.** Lights in essential spaces
+(toilets, hallways, stairs) must be controllable through a direct Zigbee bind, so
+they keep working when the network, the server or Zigbee2MQTT is down. Use
+`genOnOff` cluster binds from button to lamp. See `docs/light-with-fallback.md`.
+
+Naming convention: `{Room} lamp` / `sensor` / `knop`. Apply it from the first
+device onwards — renaming later propagates into every automation.
+
+## Planning
+
+`ROADMAP.md` holds what is agreed and what is still open. Decisions settled so
+far: Docker stays, backups go to a Hetzner Storage Box via restic, long-term
+sensor data goes to InfluxDB for a future MPC controller, remote access is
+Tailscale (no paid subscription), and the Zigbee network is built from scratch
+with nothing migrated.
