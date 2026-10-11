@@ -123,6 +123,43 @@ directly.
 
 Not built, by agreement: kiosk, backups, InfluxDB, Tailscale. See `ROADMAP.md`.
 
+## 2026-10-11 — three more devices, and the binding lesson
+
+Paired and named: `ledstrip-wellness-1` (DOMRAEM RGBWC, router),
+`draaiknop-1` (Tuya TS004F), `knop-1` (Loginovo ZG-101ZL) and `knop-2`
+(IKEA TRÅDFRI on/off switch).
+
+Most of the evening went into making a button control the lamp with the server
+down — Layer 1 of `light-with-fallback.md`. Three wrong turns, recorded so
+nobody repeats them:
+
+1. **Device-level binds report success and do nothing.** `genOnOff` and
+   `genLevelCtrl` were bound from each button straight to `globe-lamp-1`
+   endpoint 11, Zigbee2MQTT logged `Successfully bound`, and nothing ever
+   happened. These remotes drive exactly one *group*; individual devices are
+   not supported. The Zigbee2MQTT docs say so plainly for the TS004F.
+2. **`operation_mode` cannot always be written over MQTT.** Both Tuya-family
+   buttons returned `UNSUPPORTED_ATTRIBUTE`, 40 attempts at link quality 228.
+   That was read as "this hardware cannot do it" and the user was told to buy
+   different buttons — **wrong**. Both have a physical gesture that does the
+   same job: buttons 2+4 for 6s on the TS004F, a triple click on the ZG-101ZL.
+3. **A group must be addressed by friendly name.** `{"group":"901"}` was
+   rejected with `Group '901' does not exist` even though group 901 was right
+   there in the database.
+
+What finally worked: the IKEA switch had arrived already bound to **group 901**
+from a previous life. Creating a Zigbee2MQTT group with that ID and a friendly
+name, then adding `globe-lamp-1` to it, made the button work immediately —
+including with the `zigbee2mqtt` container stopped, which is the only test that
+counts.
+
+Groups now defined: `groep-globe-1` (id 1) and `groep-901` (id 901), both
+containing `globe-lamp-1`.
+
+Leftover: the ineffective device-level binds on all three buttons are still in
+place. Harmless, but misleading — they suggest a working fallback where there
+is none. Worth clearing with `bridge/request/device/binds/clear`.
+
 ## Open items created by these sessions
 
 - Zigbee2MQTT's frontend listens on `0.0.0.0:8080` with no authentication.
