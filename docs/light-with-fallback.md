@@ -56,7 +56,8 @@ physical gesture**, and that one does work:
 
 | Device | Switch to command mode |
 |---|---|
-| Tuya TS004F | hold buttons 2+4 for 6s, LED 3 flashes once |
+| Tuya TS004F (4-button) | hold buttons 2+4 for 6s, LED 3 flashes once |
+| HOBEIAN ZG-101ZD (rotary knob, reports model `TS004F`) | not documented; check `operation_mode` in its state |
 | Loginovo ZG-101ZL | triple click |
 | IKEA TRÅDFRI on/off | no mode — always sends real commands |
 
@@ -70,9 +71,19 @@ mosquitto_pub -t zigbee2mqtt/bridge/request/group/members/add \
   -m '{"group": "{Room}", "device": "{Room} lamp"}'
 ```
 
-**Step 3 — bind the button to the group.** The button must be awake: press it
-immediately before sending, and keep pressing while retrying. A sleeping
-battery device is the usual reason a bind times out.
+**Step 3 — connect the button to the group.** How depends on the remote — and
+getting it wrong looks exactly like success, so check the table:
+
+| Device | Connect to the group by |
+|---|---|
+| IKEA TRÅDFRI on/off | **bind** the button to the group |
+| Tuya-family (TS004F, ZG-101ZD knob) | **adding the button itself as a group member** |
+
+Either way the button must be awake: press it immediately before sending, and
+keep pressing while retrying. A sleeping battery device is the usual reason a
+request times out.
+
+For a bind:
 
 ```
 mosquitto_pub -t zigbee2mqtt/bridge/request/device/bind \
@@ -80,6 +91,21 @@ mosquitto_pub -t zigbee2mqtt/bridge/request/device/bind \
 ```
 
 Include `genLevelCtrl` if the button should also dim.
+
+For group membership — the remote then sends to whichever group it belongs to:
+
+```
+mosquitto_pub -t zigbee2mqtt/bridge/request/group/members/add \
+  -m '{"group": "{Room}", "device": "{Room} knop"}'
+```
+
+> **How to tell which one you need.** Turn Zigbee2MQTT's log level to `debug`
+> and press the button. Each `Received Zigbee message` line ends in
+> `with groupID N`. **`groupID 0` means the remote is talking to the coordinator
+> only** — it is not addressing any group, and no lamp will ever hear it. A bind
+> that leaves it at 0 is being ignored; switch to membership. Once it shows the
+> group's ID, the lamp responds. This check takes a minute and would have saved
+> two evenings.
 
 **A remote that was paired elsewhere may already target a group of its own.**
 The IKEA switch arrived bound to group 901 and ignored everything else; adding
@@ -127,7 +153,9 @@ These coexist with the direct Zigbee bind. The bind handles the radio-level togg
 1. **Add devices to Zigbee2MQTT** and name them `{Room} lamp`, `{Room} sensor`, `{Room} knop`
 2. **Create a Zigbee group** named `{Room}` containing the lamp — mandatory,
    not optional; the bind goes to this group and not to the lamp
-3. **Put the button in `command` mode** and **bind it to the group** (Layer 1)
+3. **Put the button in `command` mode** and **connect it to the group** —
+   bind or membership depending on the model (Layer 1); confirm with the
+   `groupID` check
 4. **Copy the automations** from an existing room, replacing the room name and entity IDs
 5. **Adjust timings** if needed (the dim/off delays in the automation)
 

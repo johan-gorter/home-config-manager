@@ -160,6 +160,43 @@ Leftover: the ineffective device-level binds on all three buttons are still in
 place. Harmless, but misleading — they suggest a working fallback where there
 is none. Worth clearing with `bridge/request/device/binds/clear`.
 
+## 2026-10-13 — lamp-tradfri-1 on the knob
+
+Paired `lamp-tradfri-1`: IKEA TRÅDFRI LED1623G12 (E27, opal, 1000 lm), IEEE
+`0x000b57fffe2f06f4`, router. It is **fixed warm white** — no
+`lightingColorCtrl` cluster, so there is no colour temperature to set; the
+request for "warmest possible" is simply what it does. LQI 36 at first contact.
+
+Goal: `draaiknop-1` drives it directly, on/off and dimming. Correction to the
+2026-10-11 entry: Zigbee2MQTT identifies `draaiknop-1` as a **HOBEIAN ZG-101ZD
+smart knob**; it only reports `TS004F` as its model ID. Its state already read
+`operation_mode: command` this time.
+
+1. Created `groep-tradfri-1` (id 2) with the lamp; a command to the group
+   reached the lamp.
+2. Bound the knob to the group (`genOnOff`, `genLevelCtrl`) and removed its old,
+   never-working device binds to `globe-lamp-1`. Zigbee2MQTT logged
+   `Successfully bound`. **The lamp did nothing.**
+3. Debug logging showed why: every message from the knob carried **`groupID 0`**
+   — addressed to the coordinator, ignoring its binding table entirely.
+4. Added the **knob itself** as a member of `groep-tradfri-1`. From the next
+   press on, its messages carried `groupID 2` and the lamp switched and dimmed.
+
+So the two remote families need different treatment: the IKEA switch follows a
+group **bind**, the Tuya-family knob follows group **membership**. Both are now
+in `light-with-fallback.md`, with the `groupID` log check as the way to tell.
+
+Verified working with Zigbee2MQTT running. **Not yet re-tested with the
+container stopped**, which is the test that counts for a fallback.
+
+Groups now: `groep-globe-1` (1) and `groep-901` (901) with `globe-lamp-1`,
+unchanged, so `knop-2` keeps controlling the globe; `groep-tradfri-1` (2) with
+`lamp-tradfri-1` and `draaiknop-1`. The knob's bind to group 2 is still there;
+harmless and ineffective.
+
+Also noticed: `ledstrip-wellness-1` (`0xa4c13833e9926b53`) is still named in
+`configuration.yaml` but no longer in Zigbee2MQTT's device database.
+
 ## Open items created by these sessions
 
 - Zigbee2MQTT's frontend listens on `0.0.0.0:8080` with no authentication.
