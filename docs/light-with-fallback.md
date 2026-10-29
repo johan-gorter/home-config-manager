@@ -129,6 +129,32 @@ the message can no longer be relayed through it. Button and lamp must be in
 direct radio range, or have a mains-powered router between them that stays up.
 A fallback button therefore belongs in the same room as its lamp.
 
+> **The button's parent must be the lamp, not the coordinator.** A battery
+> button is an end device: it reaches the network through exactly one parent.
+> Paired normally, it often picks the coordinator. If the coordinator hangs
+> for hours, the button loses its parent. It keeps working for a while, then
+> leaves the network, and its group membership goes with it. The fallback dies
+> in exactly the outage it is meant to cover.
+>
+> Fix: stand next to the lamp and pair the button **through the lamp only**
+> (in the frontend: the arrow next to *Permit join (All)*):
+>
+> ```
+> mosquitto_pub -t zigbee2mqtt/bridge/request/permit_join \
+>   -m '{"time":254,"device":"{Room} lamp"}'
+> ```
+>
+> A button that is already paired rejoins with the same address, so its name
+> stays. Re-add it to the group afterwards (`DUPLICATE_EXISTS` means it is
+> already in). Then check the parent with a raw network map
+> (`zigbee2mqtt/bridge/request/networkmap`, `{"type":"raw"}`): the button's
+> link with `relationship: 1` must point at the lamp. A passing
+> `docker stop zigbee2mqtt` test does not prove this on its own.
+>
+> Zigbee2MQTT's pairing guide suggests this same trick for linking a switch
+> directly to a bulb, and warns it is no guarantee the router is chosen or
+> kept long-term. Check the parent again after a coordinator outage.
+
 ### Layer 2: HA automation (smart behavior)
 
 When the server is running, Home Assistant adds motion-based control:
