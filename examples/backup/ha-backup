@@ -1,0 +1,67 @@
+#!/bin/bash
+# /usr/local/sbin/ha-backup — nightly backup of the Home Assistant server.
+# See docs/backup.md. Run by ha-backup.timer.
+#
+# restic → rest server with --append-only on a VPS, over WireGuard.
+# Use a host name that names the ROLE ("ha"), not the machine: a future
+# machine that takes over continues the same backup.
+#
+# Secrets in /root/.config/restic/ (mode 600), never in a repo:
+#   ha.env       RESTIC_REPOSITORY=rest:http://<login>:<pw>@10.77.0.1:8000/ha/
+#                RESTIC_PASSWORD_FILE=/root/.config/restic/ha.password
+#   ha.password  the encryption password — ALSO keep a copy in a password manager
+set -euo pipefail
+
+set -a; . /root/.config/restic/ha.env; set +a
+
+DATA=/srv/homeassistant
+STAGE=/var/backups/ha
+TOPIC=homelab/backup/ha/last_success
+
+install -d -m 700 "$STAGE"
+
+# 1. Consistent database dumps first. Copying a live database can catch a
+#    half-written file, and you only find out when restoring.
+if docker ps --format '{{.Names}}' | grep -qx influxdb; then
+    rm -rf "$STAGE/influxdb"
+    docker exec influxdb rm -rf /tmp/ha-backup
+    docker exec influxdb influx backup /tmp/ha-backup >/dev/null
+    docker cp -q influxdb:/tmp/ha-backup "$STAGE/influxdb"
+    docker exec influxdb rm -rf /tmp/ha-backup
+fi
+
+# 2. restic. HA's .storage, Matter and Zigbee2MQTT write their files atomically
+#    (temp file + rename), so copying them live is safe.
+SUMMARY=$(restic backup --host ha --tag nightly --json --quiet \
+    --exclude "$DATA/homeassistant/home-assistant_v2.db*" \
+    --exclude "$DATA/homeassistant/*.log*" \
+    --exclude "$DATA/homeassistant/tts" \
+    --exclude "$DATA/homeassistant/deps" \
+    --exclude "$DATA/homeassistant/.cache" \
+    --exclude "$DATA/zigbee2mqtt/log" \
+    --exclude "$DATA/influxdb/data" \
+    "$DATA" /etc "$STAGE" | grep '"message_type":"summary"' | tail -1)
+
+# 3. Quick structural check (no full data read).
+restic check --quiet
+
+# 4. Report success to HA via a retained MQTT message + MQTT discovery.
+PAYLOAD=$(printf '%s' "$SUMMARY" | python3 -c '
+import json, sys, datetime
+s = json.load(sys.stdin)
+print(json.dumps({
+    "time": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+    "snapshot": s.get("snapshot_id", "")[:8],
+    "added_mb": round(s.get("data_added", 0) / 1e6, 1),
+}))')
+docker exec mosquitto mosquitto_pub -r -t "$TOPIC" -m "$PAYLOAD"
+docker exec mosquitto mosquitto_pub -r -t homeassistant/sensor/ha_backup/last_success/config -m '{
+  "name": "Last backup",
+  "unique_id": "ha_backup_last_success",
+  "state_topic": "'"$TOPIC"'",
+  "value_template": "{{ value_json.time }}",
+  "json_attributes_topic": "'"$TOPIC"'",
+  "device_class": "timestamp",
+  "device": {"identifiers": ["ha_backup"], "name": "Backup"}
+}'
+echo "backup ok: $PAYLOAD"

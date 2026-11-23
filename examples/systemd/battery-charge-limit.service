@@ -1,0 +1,14 @@
+# /etc/systemd/system/battery-charge-limit.service
+# Keeps the battery between 60 and 70 %: the battery is the UPS, and 24/7 at
+# 100 % wears it out within a year or two. Check which files your laptop has:
+#   ls /sys/class/power_supply/BAT*/
+# Some firmware (e.g. Dell) ignores the thresholds until charge_types is Custom.
+[Unit]
+Description=Limit battery charging to 60-70%
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'echo 70 > /sys/class/power_supply/BAT0/charge_control_end_threshold; echo 60 > /sys/class/power_supply/BAT0/charge_control_start_threshold; [ -e /sys/class/power_supply/BAT0/charge_types ] && echo Custom > /sys/class/power_supply/BAT0/charge_types || true'
+
+[Install]
+WantedBy=multi-user.target

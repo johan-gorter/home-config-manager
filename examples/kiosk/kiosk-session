@@ -1,0 +1,5 @@
+#!/bin/sh
+# /usr/local/bin/kiosk-session — Wayland session for user kiosk.
+# cage shows exactly one full-screen app: no window manager, no Alt+Tab.
+# -d: no window decorations. -s: allow Ctrl+Alt+F<n> to reach the login screen.
+exec cage -d -s -- /usr/local/bin/kiosk-browser

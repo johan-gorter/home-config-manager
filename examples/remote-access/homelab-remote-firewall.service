@@ -1,0 +1,15 @@
+# /etc/systemd/system/homelab-remote-firewall.service
+[Unit]
+Description=Homelab remote-access firewall (SSH and WireGuard)
+DefaultDependencies=no
+Before=network-pre.target ssh.socket wg-quick@wg0.service
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/nftables.d/homelab-remote.nft
+ExecStop=/usr/sbin/nft delete table inet homelab_remote
+
+[Install]
+WantedBy=multi-user.target

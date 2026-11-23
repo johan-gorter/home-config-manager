@@ -1,0 +1,4 @@
+# Personal, per-machine files — never commit these
+CLAUDE.local.md
+.claude/settings.local.json
+.env

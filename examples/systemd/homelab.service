@@ -1,0 +1,17 @@
+# /etc/systemd/system/homelab.service — starts the Compose stack at boot.
+[Unit]
+Description=Homelab Docker Compose Stack
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/srv/homeassistant
+ExecStart=/usr/bin/docker compose up -d --remove-orphans
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target

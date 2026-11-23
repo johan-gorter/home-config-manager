@@ -1,0 +1,7 @@
+// /etc/apt/apt.conf.d/52homelab-unattended
+// Reboot only when an update asks for it (/var/run/reboot-required), and then
+// at night. unattended-upgrades runs in the morning; the reboot follows at the
+// next 03:30.
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
+Unattended-Upgrade::Automatic-Reboot-Time "03:30";

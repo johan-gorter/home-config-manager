@@ -1,0 +1,32 @@
+#!/usr/sbin/nft -f
+# /etc/nftables.d/homelab-remote.nft — remote-access firewall on the HA server.
+# Own table, so Docker's rules are untouched. Do NOT put this in
+# /etc/nftables.conf: that file starts with "flush ruleset" and wipes Docker's rules.
+#  - SSH only from localhost, the LAN and the VPS through the tunnel. Many home
+#    servers have public IPv6 addresses; without this, SSH may be reachable from
+#    the internet and you depend on the router's (untested) IPv6 firewall.
+#  - From the tunnel (wg0) only the VPS, and only SSH and Home Assistant. A
+#    hacked VPS cannot reach the rest of this machine or the home network.
+table inet homelab_remote {}
+delete table inet homelab_remote
+
+table inet homelab_remote {
+    chain input {
+        type filter hook input priority filter - 10; policy accept;
+
+        iifname "wg0" ip saddr 10.77.0.1 tcp dport { 22, 8123 } accept
+        iifname "wg0" ct state established,related accept
+        iifname "wg0" drop
+
+        tcp dport 22 iifname "lo" accept
+        tcp dport 22 ip saddr <lan-subnet>/24 accept
+        tcp dport 22 ip6 saddr { fe80::/10, fd00::/8 } accept
+        tcp dport 22 drop
+    }
+
+    chain forward {
+        type filter hook forward priority filter - 10; policy accept;
+        # Never route tunnel traffic onward into the home network.
+        iifname "wg0" drop
+    }
+}

@@ -1,0 +1,5 @@
+# /var/lib/AccountsService/users/kiosk — hides kiosk from the login screen and
+# selects its session.
+[User]
+Session=kiosk
+SystemAccount=true

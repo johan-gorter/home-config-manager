@@ -1,0 +1,17 @@
+# /etc/systemd/system/rclone-restic.service on the VPS.
+# An append-only restic REST server: the home server can add backups but can
+# never delete or overwrite them — not even when it is compromised.
+# Listens on the WireGuard address only. htpasswd: htpasswd -B -c /etc/rclone-restic/htpasswd ha
+[Unit]
+Description=restic REST server (append-only)
+After=wg-quick@wg0.service
+Requires=wg-quick@wg0.service
+
+[Service]
+User=restic-srv
+ExecStart=/usr/bin/rclone serve restic /srv/backup --append-only --private-repos \
+    --addr 10.77.0.1:8000 --htpasswd /etc/rclone-restic/htpasswd
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

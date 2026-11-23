@@ -1,0 +1,23 @@
+# /srv/homeassistant/zigbee2mqtt/configuration.yaml — starting point.
+# Zigbee2MQTT adds devices and groups below this by itself.
+homeassistant:
+  enabled: true
+frontend:
+  enabled: true
+  port: 8080
+  auth_token: <random-string>        # e.g. openssl rand -hex 16
+mqtt:
+  base_topic: zigbee2mqtt
+  server: mqtt://mosquitto:1883
+serial:
+  # Network coordinator (Ethernet/WiFi):
+  port: tcp://<coordinator-ip>:6638
+  # USB coordinator — use the udev symlink, see docs/zigbee.md:
+  # port: /dev/zigbee
+  adapter: ember                     # ember (Silicon Labs EFR32), zstack (TI CC26xx), ...
+advanced:
+  channel: 25                        # choose BEFORE anything joins, see docs/zigbee.md
+  network_key: GENERATE
+  pan_id: GENERATE
+  ext_pan_id: GENERATE
+  log_level: info

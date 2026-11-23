@@ -1,0 +1,5 @@
+# /etc/udev/rules.d/99-zigbee.rules — a stable /dev/zigbee for a USB coordinator.
+# Find the values with:  udevadm info -a -n /dev/ttyUSB0 | grep -E 'idVendor|idProduct|serial'
+# Match on the serial number when the device has a unique one. Cheap CH340-based
+# sticks often do not; match on the USB port path (KERNELS=="1-2") instead.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="<vendor>", ATTRS{idProduct}=="<product>", ATTRS{serial}=="<serial>", SYMLINK+="zigbee", GROUP="dialout", MODE="0660"

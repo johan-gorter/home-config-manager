@@ -1,0 +1,51 @@
+# Example monitoring automations. Create them through the UI or API; shown here
+# as YAML. Replace notify.mobile_app_<phone> with your own notify service.
+
+- id: monitor_zigbee_offline
+  alias: "Monitor: Zigbee2MQTT offline"
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.zigbee2mqtt_bridge_connection_state
+      to: ["off", "unavailable"]
+      for: "00:05:00"
+  actions:
+    - action: notify.mobile_app_<phone>
+      data:
+        title: Zigbee is down
+        message: >
+          Zigbee2MQTT has lost its coordinator for 5 minutes. Lights on direct
+          binds still work. First aid: power-cycle the coordinator.
+        data: {priority: high, ttl: 0}
+    - action: persistent_notification.create
+      data: {title: Zigbee is down, message: Zigbee2MQTT has lost its coordinator.}
+
+- id: monitor_backup_too_old
+  alias: "Monitor: backup too old"
+  # 48 h, not 24: one missed night (VPS maintenance) should not alarm you,
+  # or you learn to ignore the warning.
+  triggers:
+    - trigger: template
+      value_template: >
+        {{ states('sensor.backup_last_backup') in ['unknown', 'unavailable'] or
+           now() - as_datetime(states('sensor.backup_last_backup')) > timedelta(hours=48) }}
+      for: "00:10:00"
+  actions:
+    - action: notify.mobile_app_<phone>
+      data:
+        title: Backup too old
+        message: "The last successful backup is more than 48 hours old. Check: journalctl -u ha-backup"
+
+- id: monitor_button_event_mode
+  alias: "Monitor: fallback button in event mode"
+  # Some remotes switch between command and event mode with a triple click.
+  # In event mode the direct bind stops working. Warn when that happens.
+  triggers:
+    - trigger: state
+      entity_id: select.<button>_operation_mode
+      to: event
+      for: "00:00:30"
+  actions:
+    - action: notify.mobile_app_<phone>
+      data:
+        title: Fallback button switched off
+        message: "<button> is in event mode; the fallback no longer works. Fix: triple-click it quickly."

@@ -1,0 +1,4 @@
+# /etc/caddy/Caddyfile on the VPS. Caddy gets and renews the certificate itself.
+ha.example.com {
+    reverse_proxy 10.77.0.2:8123
+}

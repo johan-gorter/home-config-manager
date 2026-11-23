@@ -1,0 +1,19 @@
+#!/bin/sh
+# /usr/local/bin/kiosk-browser — runs inside cage as user kiosk.
+# Waits for Home Assistant, then keeps Firefox on the dashboard; if Firefox
+# exits or crashes it is restarted.
+URL=http://localhost:8123
+PROFILE="$HOME/snap/firefox/common/kiosk-profile"   # the Firefox snap can only write under ~/snap
+mkdir -p "$PROFILE"
+cp /usr/local/share/kiosk/user.js "$PROFILE/user.js"
+
+# Home Assistant needs a minute or more after boot; wait up to 5 minutes.
+i=0
+while [ $i -lt 150 ] && ! curl -fs -o /dev/null "$URL"; do
+    sleep 2; i=$((i + 1))
+done
+
+while true; do
+    /snap/bin/firefox --kiosk --profile "$PROFILE" "$URL"
+    sleep 3
+done

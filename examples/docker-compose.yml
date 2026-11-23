@@ -1,0 +1,100 @@
+# Example Compose file for /srv/homeassistant/docker-compose.yml.
+# Replace <placeholders>. See docs/architecture.md for the reasoning behind each choice.
+
+# Docker log files are capped, otherwise they grow forever on a small SSD.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
+    restart: unless-stopped
+    network_mode: host                  # needed for mDNS/SSDP discovery, Matter, Thread
+    cap_add: [NET_RAW, NET_ADMIN]       # instead of privileged: true (ping, DHCP discovery, WoL)
+    volumes:
+      - /srv/homeassistant/homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - TZ=<Region/City>
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8123/manifest.json"]
+      interval: 60s
+      timeout: 10s
+      start_period: 300s
+    logging: *logging
+
+  mosquitto:
+    container_name: mosquitto
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1883:1883"           # localhost only: nobody on the WiFi can drive your lights
+    volumes:
+      - /srv/homeassistant/mosquitto/config:/mosquitto/config
+      - /srv/homeassistant/mosquitto/data:/mosquitto/data
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-h", "localhost", "-t", "$$SYS/broker/uptime", "-C", "1", "-W", "5"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+    logging: *logging
+
+  zigbee2mqtt:
+    container_name: zigbee2mqtt
+    image: koenkk/zigbee2mqtt
+    restart: unless-stopped
+    ports:
+      - "8080:8080"                     # frontend; protect it with frontend.auth_token
+    volumes:
+      - /srv/homeassistant/zigbee2mqtt:/app/data
+    # Only for a USB coordinator — use the stable udev name, never /dev/ttyUSB0:
+    # devices:
+    #   - /dev/zigbee:/dev/zigbee
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    environment:
+      - TZ=<Region/City>
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/"]
+      interval: 60s
+      timeout: 10s
+      start_period: 120s
+    logging: *logging
+
+  # Optional: long-term sensor history (energy, temperatures) kept forever.
+  influxdb:
+    container_name: influxdb
+    image: influxdb:2.7
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8086:8086"
+    volumes:
+      - /srv/homeassistant/influxdb/data:/var/lib/influxdb2
+      - /srv/homeassistant/influxdb/config:/etc/influxdb2
+    env_file: /srv/homeassistant/influxdb/influxdb.env   # DOCKER_INFLUXDB_INIT_*, mode 640
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 60s
+      timeout: 10s
+      start_period: 60s
+    logging: *logging
+
+  # Optional: Matter controller. HA's Matter integration connects to ws://localhost:5580/ws.
+  matter-server:
+    container_name: matter-server
+    image: ghcr.io/matter-js/matterjs-server:stable
+    restart: unless-stopped
+    network_mode: host                  # Matter needs IPv6 link-local and mDNS on the LAN
+    volumes:
+      - /srv/homeassistant/matter-server:/data
+    environment:
+      - STORAGE_PATH=/data
+      - LISTEN_ADDRESS=127.0.0.1
+      - PRIMARY_INTERFACE=<lan-interface>   # e.g. eth0 or wlo1
+      - TZ=<Region/City>
+    logging: *logging

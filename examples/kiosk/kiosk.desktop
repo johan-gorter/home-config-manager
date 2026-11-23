@@ -1,0 +1,7 @@
+# /usr/share/wayland-sessions/kiosk.desktop — the session GDM starts for user kiosk.
+[Desktop Entry]
+Name=Kiosk
+Comment=Home Assistant dashboard, full screen
+Exec=/usr/local/bin/kiosk-session
+Type=Application
+DesktopNames=kiosk

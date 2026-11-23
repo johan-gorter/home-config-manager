@@ -1,0 +1,11 @@
+# /etc/systemd/system/ha-backup.service
+[Unit]
+Description=Nightly backup of Home Assistant (restic)
+After=docker.service wg-quick@wg0.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ha-backup
+Nice=10
+IOSchedulingClass=idle
