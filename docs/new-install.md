@@ -40,6 +40,12 @@ any script.
       reboot and check that everything is `healthy` without touching anything.
 - [ ] **Onboard Home Assistant immediately.** Until onboarding is done, anyone
       on the network can claim the owner account at `:8123`.
+- [ ] **Check the home location** (Settings → System → General), including the
+      elevation. If onboarding skipped it, or it was done through the API, it
+      quietly stays on Home Assistant's default (central Amsterdam, 0 m). That
+      default is wrong for sunrise and sunset automations and for every weather
+      integration, which picks its forecast point or nearest weather station
+      from it. Fix it before adding weather.
 
 ## 3. Zigbee
 
