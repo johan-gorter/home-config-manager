@@ -41,11 +41,25 @@ thresholds until `charge_types` is set to `Custom`.
 
 ```bash
 sudo cp examples/systemd/52homelab-unattended /etc/apt/apt.conf.d/
+sudo mkdir -p /etc/systemd/system/apt-daily.timer.d /etc/systemd/system/apt-daily-upgrade.timer.d
+sudo cp examples/systemd/apt-daily.timer.d/override.conf /etc/systemd/system/apt-daily.timer.d/
+sudo cp examples/systemd/apt-daily-upgrade.timer.d/override.conf /etc/systemd/system/apt-daily-upgrade.timer.d/
+sudo systemctl daemon-reload
+sudo systemctl restart apt-daily.timer apt-daily-upgrade.timer
+systemctl list-timers apt-daily.timer apt-daily-upgrade.timer   # check
 ```
 
-Ubuntu's `unattended-upgrades` installs updates every morning. With this file,
-when an update needs a reboot (`/var/run/reboot-required`), the machine reboots
-at the next 03:30 — and only then.
+With `52homelab-unattended`, when an update needs a reboot
+(`/var/run/reboot-required`), the machine reboots at the next 03:30 — and only
+then.
+
+**Install before the reboot time.** Out of the box Ubuntu installs updates around
+06:00 (`apt-daily-upgrade.timer`). That is *after* 03:30, so a kernel update
+installed in the morning waits until the night after for its reboot — up to two
+days behind the release. The two timer drop-ins move the download to 01:00–02:00
+and the install to 03:00–03:10, so a reboot-requiring update is finished the same
+night. Keep the install well before the reboot time: if it ends after 03:30, the
+reboot is pushed to the next night again.
 
 **No fixed nightly reboot.** A reboot shortly after a scheduled `apt upgrade` can
 land in the middle of a dpkg transaction or a database write, and whoever walks
